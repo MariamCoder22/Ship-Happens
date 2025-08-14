@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Navy Mastery Quiz</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#121a2b; --ink:#e6eefc; --muted:#9fb1d3; --acc:#37c3ff; --ok:#2ecc71; --bad:#ff5c7a; --warn:#ffb020;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(55,195,255,.15),transparent),linear-gradient(180deg,#0b1220,#0b1220 200px,#0b1220);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    header{position:sticky;top:0;background:rgba(11,18,32,.8);backdrop-filter:blur(6px);border-bottom:1px solid #1b2740;z-index:50}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    h1{font-size:28px;margin:8px 0}
+    .grid{display:grid;gap:16px}
+    .g-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .g-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    @media (max-width:900px){.g-2,.g-3{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid #1b2740;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .card h2{font-size:18px;margin:0 0 8px}
+    .card .body{padding:16px}
+    label{display:block;margin:8px 0 6px;font-weight:600;color:var(--muted)}
+    select,input[type="number"],input[type="text"],button{width:100%;padding:10px 12px;border-radius:12px;border:1px solid #24324f;background:#0d1526;color:var(--ink);font-size:14px}
+    .row{display:flex;gap:10px;align-items:center}
+    .row > *{flex:1}
+    button{cursor:pointer}
+    .btn{background:linear-gradient(180deg,#1f9be0,#1687c7);border:0;font-weight:700}
+    .btn.secondary{background:#19243c}
+    .btn.ghost{background:transparent;border:1px solid #2a3a60}
+    .btn.ok{background:linear-gradient(180deg,#2ecc71,#26b863)}
+    .btn.bad{background:linear-gradient(180deg,#ff5c7a,#e44b69)}
+    .btn.warn{background:linear-gradient(180deg,#ffb020,#e39a12)}
+
+    /* Quiz UI */
+    .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid #2a3a60;border-radius:999px;padding:6px 10px;color:var(--muted);font-size:12px}
+    .timer{font-variant-numeric:tabular-nums}
+    .q{text-wrap:balance;font-size:18px;margin:0 0 10px}
+    .choices{display:grid;gap:10px}
+    .choice{padding:12px;border:1px solid #263556;border-radius:12px;background:#0e1730;cursor:pointer}
+    .choice:hover{border-color:#3a5288}
+    .choice.selected{border-color:var(--acc);box-shadow:0 0 0 2px rgba(55,195,255,.25) inset}
+    .choice.correct{border-color:var(--ok);background:rgba(46,204,113,.08)}
+    .choice.incorrect{border-color:var(--bad);background:rgba(255,92,122,.08)}
+
+    .progress{height:8px;background:#0d1526;border-radius:999px;overflow:hidden;border:1px solid #24324f}
+    .progress > div{height:100%;background:linear-gradient(90deg,var(--acc),#7ad6ff);width:0%}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #203055;padding:10px;text-align:left;font-size:14px}
+    tr:hover td{background:#0f1931}
+    .muted{color:var(--muted)}
+    .k{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0d1526;border:1px solid #24324f;border-radius:6px;padding:2px 6px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap row">
+      <h1>⚓ Navy Mastery Quiz</h1>
+      <div class="pill"><span id="statusPill">Ready</span></div>
+    </div>
+  </header>
+
+  <main class="wrap grid g-3">
+    <section class="card">
+      <div class="body">
+        <h2>Setup</h2>
+        <label>Training mode</label>
+        <div class="row">
+          <select id="mode">
+            <option value="custom">Custom Quiz</option>
+            <option value="daily">Daily Mix (20 Q)</option>
+            <option value="review">Review Missed (max 20)</option>
+          </select>
+          <button class="btn ghost" id="loadBankBtn">📂 Import Question Bank (JSON)</button>
+        </div>
+
+        <label>Category</label>
+        <select id="category">
+          <option value="all">All Categories</option>
+          <option value="Ship Design & Naval Architecture">Ship Design & Naval Architecture</option>
+          <option value="Ship Types & Classes">Ship Types & Classes</option>
+          <option value="Weapons & Sensors">Weapons & Sensors</option>
+          <option value="Strategy & Tactics">Strategy & Tactics</option>
+          <option value="Fleet Ops & Deployment">Fleet Ops & Deployment</option>
+          <option value="Naval History">Naval History</option>
+        </select>
+
+        <label>Level</label>
+        <select id="level">
+          <option>Beginner</option>
+          <option>Intermediate</option>
+          <option>Advanced</option>
+          <option value="all">All Levels</option>
+        </select>
+
+        <div class="row">
+          <div>
+            <label># of questions</label>
+            <input id="count" type="number" min="5" max="100" value="20" />
+          </div>
+          <div>
+            <label>Timing</label>
+            <select id="timing">
+              <option value="quiz-10">10 min (whole quiz)</option>
+              <option value="quiz-20">20 min (whole quiz)</option>
+              <option value="per-30">30 s / question</option>
+              <option value="per-60">60 s / question</option>
+              <option value="none">No timer</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="startBtn">▶ Start Quiz</button>
+          <button class="btn secondary" id="exportMissedBtn">💾 Export Missed</button>
+          <button class="btn secondary" id="clearProgressBtn">🧹 Reset Progress</button>
+        </div>
+        <p class="muted" style="margin-top:8px">Tip: Press <span class="k">1–4</span> to answer quickly. <span class="k">N</span> next, <span class="k">B</span> back, <span class="k">R</span> review.</p>
+      </div>
+    </section>
+
+    <section class="card" style="grid-column:span 2">
+      <div class="body" id="quizPane">
+        <div class="row" style="justify-content:space-between;gap:12px">
+          <div class="pill"><span id="meta"></span></div>
+          <div class="pill timer" id="timer">--:--</div>
+        </div>
+        <div class="progress" style="margin:12px 0 16px"><div id="bar"></div></div>
+        <h3 class="q" id="question">Choose settings and press Start.</h3>
+        <div class="choices" id="choices"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn ghost" id="backBtn">◀ Back</button>
+          <button class="btn ghost" id="reviewBtn">🔍 Reveal / Explain</button>
+          <button class="btn" id="nextBtn">Next ▶</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="grid-column:1/-1">
+      <div class="body">
+        <h2>Results</h2>
+        <div id="summary" class="muted">Your results will appear here.</div>
+        <div id="review"></div>
+      </div>
+    </section>
+  </main>
+
+  <input type="file" id="fileInput" accept="application/json" style="display:none" />
+
+  <script>
+  // ---------- Question Bank (Starter Pack) ----------
+  // Schema: { id, category, level, q, choices:[...], answer:index, explanation }
+  const STARTER = [
+    // Ship Design & Naval Architecture
+    {id:"SD-B-1",category:"Ship Design & Naval Architecture",level:"Beginner",q:"What is a ship's displacement?",choices:["The ship's speed in knots","The weight of water displaced by the hull","The cargo volume in cubic meters","The draft plus freeboard"],answer:1,explanation:"By Archimedes' principle, displacement equals the mass of water displaced, numerically equal to the vessel's mass."},
+    {id:"SD-B-2",category:"Ship Design & Naval Architecture",level:"Beginner",q:"Which line represents the waterline on plans?",choices:["Buttock line","Sheer line","Load waterline (LWL)","Baseline"],answer:2,explanation:"The LWL is the designed waterline at a specified loading condition."},
+    {id:"SD-I-1",category:"Ship Design & Naval Architecture",level:"Intermediate",q:"Metacentric height (GM) is a primary indicator of what?",choices:["Longitudinal strength","Transverse stability","Propulsive efficiency","Seakeeping at high speeds"],answer:1,explanation:"Positive GM indicates initial (small-angle) transverse stability."},
+    {id:"SD-A-1",category:"Ship Design & Naval Architecture",level:"Advanced",q:"A bulbous bow reduces what at service speed?",choices:["Wave-making resistance","Frictional resistance","Appendage drag","Air resistance"],answer:0,explanation:"Bulbous bows destructively interfere with the bow wave, lowering wave-making resistance."},
+
+    // Ship Types & Classes
+    {id:"ST-B-1",category:"Ship Types & Classes",level:"Beginner",q:"A destroyer is best described as?",choices:["Small patrol craft","Fast, multi-role escort warship","Large capital ship with heavy armor","Underway replenishment oiler"],answer:1,explanation:"Modern destroyers are high-speed, multi-role escorts for fleets and convoys."},
+    {id:"ST-I-1",category:"Ship Types & Classes",level:"Intermediate",q:"Which platform specializes in anti-submarine warfare (ASW) escort?",choices:["LHA","FFG","SSBN","AOE"],answer:1,explanation:"Guided-missile frigates (FFG) are often optimized for ASW escort roles."},
+    {id:"ST-A-1",category:"Ship Types & Classes",level:"Advanced",q:"SSGN denotes what?",choices:["Guided-missile nuclear-powered submarine","Diesel-electric attack submarine","Ballistic-missile nuclear submarine","Nuclear training sub"],answer:0,explanation:"SSGN = Submersible Ship, Guided-missile, Nuclear powered."},
+
+    // Weapons & Sensors
+    {id:"WS-B-1",category:"Weapons & Sensors",level:"Beginner",q:"Sonar primarily detects targets using?",choices:["Electromagnetic waves","Sound waves in water","Infrared radiation","Magnetic fields only"],answer:1,explanation:"SONAR = SOund NAvigation and Ranging."},
+    {id:"WS-I-1",category:"Weapons & Sensors",level:"Intermediate",q:"A phased-array radar advantage is?",choices:["No need for a mast","Electronically steered beams for rapid tracking","Works only at low frequencies","Zero maintenance"],answer:1,explanation:"Phased arrays steer beams electronically, enabling fast tracking and multi-target handling."},
+    {id:"WS-A-1",category:"Weapons & Sensors",level:"Advanced",q:"A torpedo's wake-homing seeker tracks what?",choices:["Thermal contrast","Acoustic signature only","Surface disturbance trail","Magnetometer cues"],answer:2,explanation:"Wake-homing uses the surface wake left by a vessel to guide the torpedo."},
+
+    // Strategy & Tactics
+    {id:"STT-B-1",category:"Strategy & Tactics",level:"Beginner",q:"Sea control means?",choices:["Owning all oceans","Denying the enemy any maritime use","Freedom to use a maritime area while denying it to the enemy","Blockade of all ports"],answer:2,explanation:"Sea control is the ability to use a sea area while restricting adversary use."},
+    {id:"STT-I-1",category:"Strategy & Tactics",level:"Intermediate",q:"A carrier strike group's typical core is?",choices:["Two battleships","One aircraft carrier","Three amphibs","Six oilers"],answer:1,explanation:"A CSG is built around an aircraft carrier, with escorts and auxiliaries."},
+    {id:"STT-A-1",category:"Strategy & Tactics",level:"Advanced",q:"Area-denial strategies often emphasize?",choices:["Short-range coastal missiles & submarines","Only heavy cruisers","Sailing ships","Airships"],answer:0,explanation:"A2/AD often leans on shore-based missiles, mines, and subs to raise risk for adversaries."},
+
+    // Fleet Ops & Deployment
+    {id:"FO-B-1",category:"Fleet Ops & Deployment",level:"Beginner",q:"Replenishment at sea (RAS/UNREP) allows?",choices:["Faster shipbuilding","Sustained operations without returning to port","Higher top speed","Shallower draft"],answer:1,explanation:"Underway replenishment sustains fleets on station."},
+    {id:"FO-I-1",category:"Fleet Ops & Deployment",level:"Intermediate",q:"Which ship type typically performs alongside connected replenishment?",choices:["AOE/TAO (oiler)","DDG","SSBN","LCS"],answer:0,explanation:"Oilers and fast combat support ships conduct connected replenishment (CONREP)."},
+    {id:"FO-A-1",category:"Fleet Ops & Deployment",level:"Advanced",q:"OPTEMPO refers to?",choices:["Engine RPM","Operational tempo/pace of operations","Only training hours","Fuel burn rate"],answer:1,explanation:"OPTEMPO is the rate/pace of operations over time."},
+
+    // Naval History
+    {id:"NH-B-1",category:"Naval History",level:"Beginner",q:"Which battle is often cited as the first carrier vs. carrier battle?",choices:["Jutland","Trafalgar","Coral Sea","Midway"],answer:2,explanation:"The 1942 Battle of the Coral Sea is considered the first carrier vs. carrier battle."},
+    {id:"NH-I-1",category:"Naval History",level:"Intermediate",q:"Admiral Horatio Nelson's key tactic at Trafalgar was to?",choices:["Form a single line ahead","Break the enemy line","Avoid engagement","Use only carronades"],answer:1,explanation:"Nelson broke the Franco-Spanish line to disrupt command and firepower."},
+    {id:"NH-A-1",category:"Naval History",level:"Advanced",q:"Dreadnought (1906) revolutionized navies by?",choices:["Diesel propulsion","All-big-gun armament & turbine propulsion","Wooden hulls","Submarine snorkels"],answer:1,explanation:"HMS Dreadnought introduced turbine power and uniform heavy guns."}
+  ];
+
+  // ---------- State & Utilities ----------
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const storage = {
+    get(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def }catch{ return def } },
+    set(key, val){ localStorage.setItem(key, JSON.stringify(val)) }
+  }
+  const shuffle = arr => arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(v=>v[1]);
+
+  let BANK = [...STARTER];
+  let QUIZ = { items:[], index:0, answers:{}, startedAt:null, endsAt:null, mode:"custom" };
+
+  // ---------- UI Bindings ----------
+  const metaEl = $('#meta');
+  const qEl = $('#question');
+  const choicesEl = $('#choices');
+  const timerEl = $('#timer');
+  const barEl = $('#bar');
+  const reviewDiv = $('#review');
+  const summaryDiv = $('#summary');
+  const statusPill = $('#statusPill');
+
+  function setStatus(txt){ statusPill.textContent = txt; }
+
+  function applyProgress(){
+    const pct = (QUIZ.index / Math.max(1, QUIZ.items.length)) * 100;
+    barEl.style.width = pct + '%';
+    metaEl.textContent = QUIZ.items.length ? `Q ${QUIZ.index+1} / ${QUIZ.items.length}` : '—';
+  }
+
+  function fmtTime(s){ const m=Math.floor(s/60), r=s%60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` }
+
+  let tickHandle=null;
+  function startTimer(totalSec){
+    clearInterval(tickHandle);
+    if(totalSec===null){ timerEl.textContent='--:--'; return }
+    let remain = totalSec;
+    timerEl.textContent = fmtTime(remain);
+    tickHandle = setInterval(()=>{
+      remain -= 1;
+      timerEl.textContent = fmtTime(Math.max(0,remain));
+      if(remain<=0){ clearInterval(tickHandle); finishQuiz(true); }
+    },1000);
+  }
+
+  function buildQuiz(){
+    const mode = $('#mode').value;
+    const cat = $('#category').value;
+    const lvl = $('#level').value;
+    const count = Math.min(parseInt($('#count').value||20,10), 100);
+    let pool = BANK.slice();
+    if(cat!=='all') pool = pool.filter(x=>x.category===cat);
+    if(lvl!=='all') pool = pool.filter(x=>x.level===lvl);
+
+    if(mode==='daily'){
+      // 20 mixed Q, balanced by level if possible
+      const byLevel = ['Beginner','Intermediate','Advanced'].map(L=>shuffle(pool.filter(x=>x.level===L)).slice(0,7));
+      pool = shuffle([...byLevel[0],...byLevel[1],...byLevel[2]]).slice(0,20);
+    } else if(mode==='review'){
+      const missed = storage.get('navy_missed',[]);
+      const ids = new Set(missed.map(m=>m.id));
+      pool = shuffle(BANK.filter(x=>ids.has(x.id))).slice(0,20);
+    }
+
+    const items = shuffle(pool).slice(0, mode==='daily'?20:count);
+
+    QUIZ = { items, index:0, answers:{}, startedAt:Date.now(), endsAt:null, mode };
+
+    // Timer setup
+    const timing = $('#timing').value;
+    let totalSec = null;
+    if(timing.startsWith('quiz-')){
+      totalSec = parseInt(timing.split('-')[1],10)*60; // minutes
+    } else if(timing.startsWith('per-')){
+      totalSec = parseInt(timing.split('-')[1],10) * items.length;
+    }
+    QUIZ.endsAt = totalSec ? (Date.now() + totalSec*1000) : null;
+    startTimer(totalSec);
+
+    setStatus(`Quiz started (${items.length} Q)`);
+    renderQuestion();
+    summaryDiv.innerHTML = 'In progress…';
+    reviewDiv.innerHTML = '';
+  }
+
+  function renderQuestion(){
+    if(!QUIZ.items.length){ qEl.textContent = 'No questions match your filters (try importing a bank).'; choicesEl.innerHTML=''; return }
+    const item = QUIZ.items[QUIZ.index];
+    applyProgress();
+    qEl.textContent = `${item.q}`;
+    const sel = QUIZ.answers[item.id]?.choice;
+    choicesEl.innerHTML = '';
+    item.choices.forEach((c,i)=>{
+      const btn = document.createElement('button');
+      btn.className = 'choice'+(sel===i?' selected':'');
+      btn.textContent = `${i+1}. ${c}`;
+      btn.onclick = ()=> selectChoice(i);
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function selectChoice(i){
+    const item = QUIZ.items[QUIZ.index];
+    QUIZ.answers[item.id] = { choice:i, correct: i===item.answer };
+    renderQuestion();
+  }
+
+  function reveal(){
+    const item = QUIZ.items[QUIZ.index];
+    const sel = QUIZ.answers[item.id]?.choice;
+    $$('.choice').forEach((el,idx)=>{
+      el.classList.remove('selected');
+      if(idx===item.answer) el.classList.add('correct');
+      if(sel!=null && idx===sel && sel!==item.answer) el.classList.add('incorrect');
+    });
+    if(item.explanation){
+      qEl.innerHTML = `${item.q}<br><span class="muted">Explanation: ${item.explanation}</span>`;
+    }
+  }
+
+  function next(){
+    if(QUIZ.index < QUIZ.items.length-1){ QUIZ.index++; renderQuestion(); }
+    else { finishQuiz(false); }
+  }
+  function back(){ if(QUIZ.index>0){ QUIZ.index--; renderQuestion(); } }
+
+  function finishQuiz(timeExpired){
+    clearInterval(tickHandle);
+    const took = Math.round(((Date.now() - (QUIZ.startedAt||Date.now()))/1000));
+    const results = QUIZ.items.map(item=>{
+      const r = QUIZ.answers[item.id]||{choice:null,correct:false};
+      return { ...item, ...r };
+    });
+    const correct = results.filter(r=>r.correct).length;
+    const total = results.length;
+    const pct = total? Math.round((correct/total)*100):0;
+
+    // Save missed
+    const missed = results.filter(r=>!r.correct).map(r=>({id:r.id, when:Date.now()}));
+    const prev = storage.get('navy_missed',[]);
+    // de-dup by id, keep recent timestamp
+    const merged = {};
+    [...prev,...missed].forEach(m=>{ merged[m.id] = m; });
+    storage.set('navy_missed', Object.values(merged));
+
+    summaryDiv.innerHTML = `<div class="grid g-3">
+      <div class="card"><div class="body"><h2>Score</h2><div style="font-size:28px;font-weight:800">${correct}/${total} (${pct}%)</div></div></div>
+      <div class="card"><div class="body"><h2>Time</h2><div style="font-size:28px;font-weight:800">${fmtTime(took)}</div></div></div>
+      <div class="card"><div class="body"><h2>Status</h2><div style="font-size:20px">${timeExpired?'<span class="muted">⏱️ Time expired</span>':'Completed'}</div></div></div>
+    </div>`;
+
+    // Detailed review
+    reviewDiv.innerHTML = `<h3>Review</h3>
+      <table><thead><tr><th>#</th><th>Category</th><th>Level</th><th>Question</th><th>Your</th><th>Correct</th><th>Result</th></tr></thead>
+      <tbody>
+      ${results.map((r,idx)=>{
+        const your = r.choice!=null? (r.choices[r.choice]||'<i>—</i>'):'<i>—</i>';
+        const corr = r.choices[r.answer];
+        return `<tr>
+          <td>${idx+1}</td>
+          <td>${r.category}</td>
+          <td>${r.level}</td>
+          <td>${r.q}${r.explanation?`<div class='muted'>${r.explanation}</div>`:''}</td>
+          <td>${your}</td>
+          <td>${corr}</td>
+          <td>${r.correct?'<span style="color:var(--ok)">✔</span>':'<span style="color:var(--bad)">✘</span>'}</td>
+        </tr>`
+      }).join('')}
+      </tbody></table>`;
+
+    setStatus(`Finished • Score ${pct}%`);
+  }
+
+  // ---------- Import/Export ----------
+  $('#loadBankBtn').onclick = ()=> $('#fileInput').click();
+  $('#fileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const incoming = JSON.parse(reader.result);
+        if(!Array.isArray(incoming)) throw new Error('JSON must be an array');
+        const ok = incoming.every(x=> x && typeof x.q==='string' && Array.isArray(x.choices) && Number.isInteger(x.answer));
+        if(!ok) throw new Error('Items need fields: id, category, level, q, choices[], answer, explanation');
+        BANK = mergeBanks(BANK, incoming);
+        setStatus(`Imported ${incoming.length} questions`);
+      }catch(err){ alert('Import failed: '+err.message); }
+    };
+    reader.readAsText(file);
+  });
+
+  $('#exportMissedBtn').onclick = ()=>{
+    const missedIds = new Set(storage.get('navy_missed',[]).map(m=>m.id));
+    const data = BANK.filter(q=>missedIds.has(q.id));
+    downloadJSON(data, 'navy_missed_review.json');
+  };
+  $('#clearProgressBtn').onclick = ()=>{ if(confirm('Clear missed-history and reset?')){ storage.set('navy_missed',[]); setStatus('Progress reset'); } };
+
+  function mergeBanks(base, add){
+    const map = new Map(base.map(x=>[x.id,x]));
+    add.forEach(x=> map.set(x.id,x));
+    return Array.from(map.values());
+  }
+
+  function downloadJSON(obj, name){
+    const blob = new Blob([JSON.stringify(obj,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- Controls ----------
+  $('#startBtn').onclick = buildQuiz;
+  $('#nextBtn').onclick = next;
+  $('#backBtn').onclick = back;
+  $('#reviewBtn').onclick = reveal;
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', (e)=>{
+    if(['1','2','3','4'].includes(e.key)){
+      const i = parseInt(e.key,10)-1; const btn = $$('.choice')[i]; if(btn) btn.click();
+    } else if(e.key==='n' || e.key==='N'){ next(); }
+    else if(e.key==='b' || e.key==='B'){ back(); }
+    else if(e.key==='r' || e.key==='R'){ reveal(); }
+  });
+
+  // ---------- Example Bank Template (for building 100Q sets) ----------
+  // Use this format to create your own JSON file and import it:
+  // [
+  //   {"id":"ST-B-101","category":"Ship Types & Classes","level":"Beginner","q":"Corvettes are typically?","choices":["Large capital ships","Small, fast patrol/escort ships","Submarines","Amphibious assault ships"],"answer":1,"explanation":"Corvettes are smaller than frigates, often used for patrol and escort."},
+  //   ... 99 more ...
+  // ]
+
+  </script>
+</body>
+</html>
